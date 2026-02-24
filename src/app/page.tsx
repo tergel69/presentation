@@ -29,7 +29,7 @@ import {
   AlertCircle,
   List,
   Star,
-  ChildHeadIcon
+  User
 } from 'lucide-react';
 
 // Icon mapping
