@@ -1,10 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  trailingSlash: true,
+  // Remove static export for Vercel deployment
   images: {
-    unoptimized: true
-  }
+    domains: ['localhost'],
+  },
 }
 
 module.exports = nextConfig
