@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { slides, sections, SlideContent } from '@/data/slides';
 import { useSlideNavigation } from '@/hooks/useSlideNavigation';
@@ -184,6 +184,14 @@ function StatsBox({ stats, sectionNumber }: { stats: NonNullable<SlideContent['s
           {stat.description && (
             <div className="text-xs text-gray-500 mt-1">{stat.description}</div>
           )}
+          {typeof stat.chartValue === 'number' && (
+            <div className="mt-3 h-2 w-full rounded-full bg-white/70 border border-gray-200 overflow-hidden">
+              <div
+                className={`${color.accent} h-full`}
+                style={{ width: `${Math.max(0, Math.min(100, stat.chartValue))}%` }}
+              />
+            </div>
+          )}
         </motion.div>
       ))}
     </div>
@@ -313,8 +321,13 @@ function CaseStudyBox({ caseStudy }: { caseStudy: NonNullable<SlideContent['case
 
 // Quiz Component
 function QuizBox({ quiz }: { quiz: NonNullable<SlideContent['quiz']> }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
+
+  const currentQuestion = quiz.questions[currentIndex];
+  const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
+  const correctLabel = `${String.fromCharCode(65 + currentQuestion.correctAnswer)}. ${currentQuestion.options[currentQuestion.correctAnswer]}`;
   
   const handleSelect = (index: number) => {
     if (!showResult) {
@@ -322,73 +335,117 @@ function QuizBox({ quiz }: { quiz: NonNullable<SlideContent['quiz']> }) {
     }
   };
   
-  const handleCheck = () => {
-    setShowResult(true);
+  const handleCheck = () => setShowResult(true);
+
+  const handleNext = () => {
+    if (currentIndex < quiz.questions.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+      setSelectedAnswer(null);
+      setShowResult(false);
+    } else {
+      setCurrentIndex(0);
+      setSelectedAnswer(null);
+      setShowResult(false);
+    }
   };
-  
-  const handleReset = () => {
-    setSelectedAnswer(null);
-    setShowResult(false);
-  };
+
+  useEffect(() => {
+    if (!showResult) return;
+    if (currentIndex >= quiz.questions.length - 1) return;
+    const timer = setTimeout(() => {
+      handleNext();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [showResult, currentIndex, quiz.questions.length]);
   
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 mb-6 border border-green-200"
+      className="relative bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 mb-6 border border-green-200"
     >
+      {showResult && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute -top-3 left-0 right-0 z-[99] px-6"
+        >
+          <div className={`rounded-lg border px-4 py-2 shadow-sm text-sm ${
+            isCorrect ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            <div className="font-semibold">{isCorrect ? 'Зөв хариулт.' : 'Буруу хариулт.'}</div>
+            <div className="mt-1">{currentQuestion.explanation}</div>
+            {!isCorrect && (
+              <div className="mt-1 text-xs text-red-700">Зөв нь: {correctLabel}</div>
+            )}
+          </div>
+        </motion.div>
+      )}
       <div className="flex items-center gap-2 mb-4">
         <HelpCircle className="h-5 w-5 text-green-500" />
         <h4 className="font-bold text-green-800">Асуулт</h4>
+        <div className="ml-auto text-xs text-green-700">
+          {currentIndex + 1}/{quiz.questions.length}
+        </div>
       </div>
-      <p className="text-gray-800 font-medium mb-4">{quiz.question}</p>
-      <div className="space-y-2 mb-4">
-        {quiz.options.map((option, index) => {
-          let bgClass = 'bg-white hover:bg-green-50';
-          if (showResult) {
-            if (index === quiz.correctAnswer) {
-              bgClass = 'bg-green-100 border-green-400';
-            } else if (index === selectedAnswer && selectedAnswer !== quiz.correctAnswer) {
-              bgClass = 'bg-red-100 border-red-400';
-            }
-          } else if (selectedAnswer === index) {
-            bgClass = 'bg-green-100 border-green-400';
-          }
-          
-          return (
-            <motion.div
-              key={index}
-              whileHover={{ scale: showResult ? 1 : 1.02 }}
-              whileTap={{ scale: showResult ? 1 : 0.98 }}
-              onClick={() => handleSelect(index)}
-              className={`cursor-pointer rounded-lg p-3 border-2 transition-all ${bgClass}`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-medium ${
-                  selectedAnswer === index ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300'
-                }`}>
-                  {String.fromCharCode(65 + index)}
-                </div>
-                <span className="text-gray-700">{option}</span>
-                {showResult && index === quiz.correctAnswer && (
-                  <CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
-                )}
-                {showResult && index === selectedAnswer && index !== quiz.correctAnswer && (
-                  <X className="h-5 w-5 text-red-500 ml-auto" />
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentIndex}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.2 }}
+        >
+          <p className="text-gray-800 font-medium mb-4">{currentQuestion.question}</p>
+          <div className="space-y-2 mb-4">
+            {currentQuestion.options.map((option, index) => {
+              let bgClass = 'bg-white hover:bg-green-50';
+              if (showResult) {
+                if (index === currentQuestion.correctAnswer) {
+                  bgClass = 'bg-green-100 border-green-400';
+                } else if (index === selectedAnswer && selectedAnswer !== currentQuestion.correctAnswer) {
+                  bgClass = 'bg-red-100 border-red-400';
+                }
+              } else if (selectedAnswer === index) {
+                bgClass = 'bg-green-100 border-green-400';
+              }
+
+              return (
+                <motion.div
+                  key={index}
+                  whileHover={{ scale: showResult ? 1 : 1.02 }}
+                  whileTap={{ scale: showResult ? 1 : 0.98 }}
+                  onClick={() => handleSelect(index)}
+                  className={`cursor-pointer rounded-lg p-3 border-2 transition-all ${bgClass}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-medium ${
+                      selectedAnswer === index ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300'
+                    }`}>
+                      {String.fromCharCode(65 + index)}
+                    </div>
+                    <span className="text-gray-700">{option}</span>
+                    {showResult && index === currentQuestion.correctAnswer && (
+                      <CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
+                    )}
+                    {showResult && index === selectedAnswer && index !== currentQuestion.correctAnswer && (
+                      <X className="h-5 w-5 text-red-500 ml-auto" />
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+      </AnimatePresence>
       <div className="flex gap-2">
         {!showResult ? (
           <Button onClick={handleCheck} disabled={selectedAnswer === null} className="bg-green-500 hover:bg-green-600">
             Хариулт шалгах
           </Button>
         ) : (
-          <Button onClick={handleReset} variant="outline">
-            Дахин оролдох
+          <Button onClick={handleNext} variant="outline">
+            {currentIndex < quiz.questions.length - 1 ? 'Дараагийн асуулт' : 'Дуусгах'}
           </Button>
         )}
       </div>
@@ -460,7 +517,7 @@ function TOCSlide({ goToSlide }: { goToSlide: (slide: number) => void }) {
     <div className="space-y-4">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-gray-800 mb-2">Агуулгын жагсаалт</h2>
-        <p className="text-gray-600">Хичээлийн бүтэц, 7 хэсэг, 40 хуудас</p>
+        <p className="text-gray-600">Хичээлийн бүтэц, 7 хэсэг, 33 хуудас</p>
       </div>
       
       {sections.map((section, index) => {
@@ -795,6 +852,16 @@ function StatsSlide({ slide }: { slide: SlideContent }) {
           <HighlightBox title={slide.highlightBox.title} content={slide.highlightBox.content} />
         </motion.div>
       )}
+
+      {slide.references && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <ReferencesBox references={slide.references} />
+        </motion.div>
+      )}
     </div>
   );
 }
@@ -888,6 +955,26 @@ function DiagramSlide({ slide }: { slide: SlideContent }) {
           transition={{ delay: 0.6 }}
         >
           <TipsBox tips={slide.tips} />
+        </motion.div>
+      )}
+
+      {slide.quiz && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+        >
+          <QuizBox quiz={slide.quiz} />
+        </motion.div>
+      )}
+
+      {slide.references && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+        >
+          <ReferencesBox references={slide.references} />
         </motion.div>
       )}
     </div>
@@ -1005,9 +1092,9 @@ export default function Presentation() {
     toggleFullscreen,
     hasNext,
     hasPrevious,
-  } = useSlideNavigation();
+  } = useSlideNavigation(slides.length);
   
-  const slide = slides[currentSlide - 1];
+  const slide = slides[currentSlide - 1] ?? slides[0];
   const color = getSectionColor(slide.sectionNumber);
   
   return (

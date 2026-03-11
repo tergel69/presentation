@@ -3,23 +3,22 @@
 import { useState, useEffect, useCallback } from 'react';
 
 const STORAGE_KEY = 'presentation_last_slide';
-const TOTAL_SLIDES = 40;
 
 // Helper function to get initial slide from localStorage
-function getInitialSlide(): number {
+function getInitialSlide(totalSlides: number): number {
   if (typeof window === 'undefined') return 1;
   const savedSlide = localStorage.getItem(STORAGE_KEY);
   if (savedSlide) {
     const slideNumber = parseInt(savedSlide, 10);
-    if (slideNumber >= 1 && slideNumber <= TOTAL_SLIDES) {
+    if (slideNumber >= 1 && slideNumber <= totalSlides) {
       return slideNumber;
     }
   }
   return 1;
 }
 
-export function useSlideNavigation() {
-  const [currentSlide, setCurrentSlide] = useState(getInitialSlide);
+export function useSlideNavigation(totalSlides: number) {
+  const [currentSlide, setCurrentSlide] = useState(() => getInitialSlide(totalSlides));
   const [isAnimating, setIsAnimating] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -42,18 +41,18 @@ export function useSlideNavigation() {
 
   // Navigation functions - defined before use in useEffect
   const goToSlide = useCallback((slideNumber: number) => {
-    if (slideNumber >= 1 && slideNumber <= TOTAL_SLIDES && slideNumber !== currentSlide) {
+    if (slideNumber >= 1 && slideNumber <= totalSlides && slideNumber !== currentSlide) {
       setIsAnimating(true);
       setCurrentSlide(slideNumber);
       setTimeout(() => setIsAnimating(false), 300);
     }
-  }, [currentSlide]);
+  }, [currentSlide, totalSlides]);
 
   const goNext = useCallback(() => {
-    if (currentSlide < TOTAL_SLIDES) {
+    if (currentSlide < totalSlides) {
       goToSlide(currentSlide + 1);
     }
-  }, [currentSlide, goToSlide]);
+  }, [currentSlide, goToSlide, totalSlides]);
 
   const goPrevious = useCallback(() => {
     if (currentSlide > 1) {
@@ -97,9 +96,9 @@ export function useSlideNavigation() {
           e.preventDefault();
           goToSlide(1);
           break;
-        case 'End':
+      case 'End':
           e.preventDefault();
-          goToSlide(TOTAL_SLIDES);
+          goToSlide(totalSlides);
           break;
         case 'f':
         case 'F':
@@ -120,11 +119,11 @@ export function useSlideNavigation() {
     };
   }, [currentSlide, isFullscreen, goNext, goPrevious, goToSlide, toggleFullscreen]);
 
-  const progress = (currentSlide / TOTAL_SLIDES) * 100;
+  const progress = (currentSlide / totalSlides) * 100;
 
   return {
     currentSlide,
-    totalSlides: TOTAL_SLIDES,
+    totalSlides,
     progress,
     isAnimating,
     isFullscreen,
@@ -132,7 +131,7 @@ export function useSlideNavigation() {
     goPrevious,
     goToSlide,
     toggleFullscreen,
-    hasNext: currentSlide < TOTAL_SLIDES,
+    hasNext: currentSlide < totalSlides,
     hasPrevious: currentSlide > 1,
   };
 }
